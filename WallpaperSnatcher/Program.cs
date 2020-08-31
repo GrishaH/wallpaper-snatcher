@@ -28,34 +28,44 @@ namespace WallpaperSnatcher
             }
         }
 
+        static (string URL, string title) parseAPI(dynamic childrenArray, int xthVal)
+        {
+            string URL = childrenArray[xthVal].data.url;
+            string title = childrenArray[xthVal].data.title;
+            if (URL.Length == 0)
+            {
+                throw new System.ArgumentNullException("URL is empty. Invalid target.");
+            }
+            Console.WriteLine(URL);
+            Console.WriteLine(title);
+            return (URL, title);
+        }
+
         static void Main(string[] args)
         {
             string redditJson;
             dynamic childrenArray;
+            int wallpaperAmount = 10;
             string requestedUrl = "https://www.reddit.com/r/wallpapers/.json";
             using (WebClient wc = new WebClient())
             {
                 redditJson = wc.DownloadString(requestedUrl);
             }
-            dynamic parsedString = Newtonsoft.Json.JsonConvert.DeserializeObject(redditJson);
+            dynamic parsedJson = Newtonsoft.Json.JsonConvert.DeserializeObject(redditJson);
 
-            childrenArray = parsedString.data.children;
+
+            childrenArray = parsedJson.data.children;
             Console.WriteLine(childrenArray[0].data.url);
-            string URL = childrenArray[0].data.url;
-            string title = childrenArray[0].data.title;
 
 
-            if (URL.Length == 0)
+            for (int i = 0; i < wallpaperAmount; i++)
             {
-                throw new System.ArgumentNullException("URL is empty. Invalid target.");
+                var URLFilenameTuple = parseAPI(childrenArray, i);
+                downloadFile(URLFilenameTuple.Item1, URLFilenameTuple.Item2);
             }
-            downloadFile(URL, title);
 
-
-
-
-            Console.WriteLine(URL);
-            Console.WriteLine(title);
+            // Immediate todo:
+            // ([<>:"|?*\/\\]) block out illegal characters for windows, and maybe illegal names
 
 
             /* General structure of code:
@@ -66,6 +76,7 @@ namespace WallpaperSnatcher
              *  4a. Otherwise, in the future, save thumbnails and let user tick off what they want.
              *  5. Save and exit.
              */
+
         }
     } 
 }
