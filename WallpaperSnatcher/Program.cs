@@ -36,6 +36,13 @@ namespace WallpaperSnatcher
 
         static (string URL, string title) parseAPI(dynamic childrenArray, int xthVal)
         {
+            if (!((bool) childrenArray[xthVal].data.is_reddit_media_domain &&
+                childrenArray[xthVal].data.post_hint == "image" ))
+            {
+                return (null, null); // Not a supported medium or fails score check, ignore.
+            } else if (childrenArray[xthVal].data.score < ConfigurationManager.AppSettings["userScore"]) {
+                return (null, "lowScore");
+            }
             string URL = childrenArray[xthVal].data.url;
             string title = childrenArray[xthVal].data.title;
             if (URL.Length == 0)
@@ -49,48 +56,75 @@ namespace WallpaperSnatcher
             return (URL, title);
         }
 
+        static void setOptions(string setting) // Actually changes the configs
+        {
+            string tempVal = "";
+
+            while (string.IsNullOrEmpty(tempVal))
+            {
+                Console.WriteLine("Please enter a value for " + setting + ": ");
+                tempVal = Console.ReadLine();
+                if (setting.Equals("imageCount")) // Make sure the one entry that is an int is valid
+                {
+                    if (!int.TryParse(tempVal, out _))
+                    {
+                        Console.WriteLine("Enter a valid integer for this option.");
+                        tempVal = "";
+                    }
+                }
+                try
+                {
+                    var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+                    var settings = configFile.AppSettings.Settings;
+                    if (settings[setting] == null)
+                    {
+                        settings.Add(setting, tempVal);
+                    }
+                    else
+                    {
+                        settings[setting].Value = tempVal;
+                    }
+                    configFile.Save(ConfigurationSaveMode.Modified);
+                    ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
+                }
+                catch (ConfigurationErrorsException)
+                {
+                    Console.WriteLine("Error saving configuration.");
+                }
+            }
+            // TODO: Does this actually save it to the local file??
+        }
+
         static void checkOptions()
         {
             String[] listOfSettings = { "filePath", "webLocation", "imageCount" };
             foreach (string setting in listOfSettings) {
                 if (ConfigurationManager.AppSettings[setting] == null || ConfigurationManager.AppSettings[setting].Length == 0)
                 {
-                    string tempVal = "";
-
-                    while (string.IsNullOrEmpty(tempVal))
-                    {
-                        Console.WriteLine("Please enter a value for " + setting + ": ");
-                        tempVal = Console.ReadLine();
-                        if (setting.Equals("imageCount"))
-                        {
-                            if (!int.TryParse(tempVal, out _)) {
-                                Console.WriteLine("Enter a valid integer for this option.");
-                                tempVal = "";
-                            }
-                        }
-                        try
-                        {
-                            var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-                            var settings = configFile.AppSettings.Settings;
-                            if (settings[setting] == null)
-                            {
-                                settings.Add(setting, tempVal);
-                            }
-                            else
-                            {
-                                settings[setting].Value = tempVal;
-                            }
-                            configFile.Save(ConfigurationSaveMode.Modified);
-                            ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
-                        }
-                        catch (ConfigurationErrorsException)
-                        {
-                            Console.WriteLine("Error saving configuration.");
-                        }
-                    }
-                    // TODO: Does this actually save it to the local file??
+                    setOptions(setting);
                 }
             }
+        }
+
+        static void modifyOptions() // Lets user decide what config to change if any
+        {
+            Console.WriteLine("");
+            Console.WriteLine("-CHANGING OPTIONS-");
+            Console.WriteLine("");
+            foreach (string key in ConfigurationManager.AppSettings)
+            {
+                Console.WriteLine(key + " : " + ConfigurationManager.AppSettings[key]);
+                Console.WriteLine("----------");
+            }
+            Console.WriteLine("");
+            Console.WriteLine("Please write the name of the option you would like to change: ");
+            string userInput = Console.ReadLine();
+            while (ConfigurationManager.AppSettings[userInput] == null)
+            {
+                Console.WriteLine("\"" + userInput + "\" is not present in the current list of options. Please enter a valid option: ");
+                userInput = Console.ReadLine();
+            }
+            setOptions(userInput);
         }
 
         static void Main(string[] args)
@@ -105,7 +139,7 @@ namespace WallpaperSnatcher
             string choice = Console.ReadLine();
             if (choice.Equals("9"))
             {
-                // New function to change all options
+                modifyOptions();
             }
             int wallpaperAmount = int.Parse(ConfigurationManager.AppSettings["imageCount"]);
             string requestedUrl = ConfigurationManager.AppSettings["webLocation"];
@@ -120,14 +154,22 @@ namespace WallpaperSnatcher
             for (int i = 0; i < wallpaperAmount; i++) // Loop through the top x posts
             {
                 var URLFilenameTuple = parseAPI(childrenArray, i);
-                downloadFile(URLFilenameTuple.Item1, URLFilenameTuple.Item2);
+                if (URLFilenameTuple.Item2 == "lowScore") // TODO, seems messy
+                {
+                    Console.WriteLine("Post has insufficient user score, skipping post...");
+                }
+                else if (!(URLFilenameTuple.Item1 == null || URLFilenameTuple.Item2 == null))
+                {
+                    downloadFile(URLFilenameTuple.Item1, URLFilenameTuple.Item2);
+                }
+                else
+                {
+                    Console.WriteLine("Unsupported media type entered, skipping post...");
+                }
             }
 
             //TODO:
             // Something about the filename extention / types, it's a bit risky
-            // Default options, give customability, etc
-            // is_reddit_media_domain - Might be the json tag to see if it is an image or not? Or at least hosted on Reddit's media domain.
-            // post_hint? is_video?
 
 
             /* General structure of code:
