@@ -8,25 +8,42 @@ using System.Net.Http;
 using System.IO;
 using System.Threading.Tasks;
 using System.Configuration;
+using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace WallpaperSnatcher
 {
     class Program
     {
-        static string getFileType(string URL)
+        static string getFileType(string url)
         {
-            // TODO
-            return URL.Substring(URL.Length - 4);
+            url = url.Split('?')[0];
+            url = url.Split('/').Last();
+            if (url.Contains('.'))
+            {
+                return url.Substring(url.LastIndexOf('.'));
+            }
+            else
+            {
+                return "";
+            }
         }
 
-        static void downloadFile(string URL, string fileName)
+        static void downloadFile(string url, string fileName)
         {
             string folderLocation = ConfigurationManager.AppSettings["filePath"];
-            string fileType = getFileType(URL);
-            using (WebClient client = new WebClient())
+            string fileType = getFileType(url);
+            if (fileType.Equals(""))
             {
-                Console.WriteLine("Saving file as: " + folderLocation + fileName + fileType);
-                client.DownloadFile(URL, folderLocation + fileName + fileType);
+                Console.WriteLine("File type not found for URL: " + url + " , Skipping post...");
+            }
+            else
+            {
+                using (WebClient client = new WebClient())
+                {
+                    Console.WriteLine("Saving file as: " + folderLocation + fileName + fileType + "\n");
+                    client.DownloadFile(url, folderLocation + fileName + fileType);
+                }
             }
         }
         static string removeInvalidChars(string fileName)
@@ -34,7 +51,7 @@ namespace WallpaperSnatcher
             return string.Join("", fileName.Split(Path.GetInvalidFileNameChars()));
         }
 
-        static (string URL, string title) parseAPI(dynamic childrenArray, int xthVal)
+        static (string url, string title) parseAPI(dynamic childrenArray, int xthVal)
         {
             if (!((bool) childrenArray[xthVal].data.is_reddit_media_domain &&
                 childrenArray[xthVal].data.post_hint == "image" ))
@@ -43,17 +60,16 @@ namespace WallpaperSnatcher
             } else if (childrenArray[xthVal].data.score < ConfigurationManager.AppSettings["userScore"]) {
                 return (null, "lowScore");
             }
-            string URL = childrenArray[xthVal].data.url;
+            string url = childrenArray[xthVal].data.url;
             string title = childrenArray[xthVal].data.title;
-            if (URL.Length == 0)
+            if (url.Length == 0)
             {
-                throw new System.ArgumentNullException("URL is empty. Invalid target.");
+                throw new System.ArgumentNullException("url is empty. Invalid target.");
             }
-            Console.WriteLine("Name before:" + title);
             title = removeInvalidChars(title);
-            Console.WriteLine(URL);
-            Console.WriteLine("Name after:" + title);
-            return (URL, title);
+            // Console.WriteLine(url);
+            Console.WriteLine("Name:" + title);
+            return (url, title);
         }
 
         static void setOptions(string setting) // Actually changes the configs
@@ -108,16 +124,13 @@ namespace WallpaperSnatcher
 
         static void modifyOptions() // Lets user decide what config to change if any
         {
-            Console.WriteLine("");
-            Console.WriteLine("-CHANGING OPTIONS-");
-            Console.WriteLine("");
+            Console.WriteLine("\n-CHANGING OPTIONS-\n");
             foreach (string key in ConfigurationManager.AppSettings)
             {
                 Console.WriteLine(key + " : " + ConfigurationManager.AppSettings[key]);
                 Console.WriteLine("----------");
             }
-            Console.WriteLine("");
-            Console.WriteLine("Please write the name of the option you would like to change: ");
+            Console.WriteLine("\nPlease write the name of the option you would like to change: ");
             string userInput = Console.ReadLine();
             while (ConfigurationManager.AppSettings[userInput] == null)
             {
@@ -153,34 +166,20 @@ namespace WallpaperSnatcher
 
             for (int i = 0; i < wallpaperAmount; i++) // Loop through the top x posts
             {
-                var URLFilenameTuple = parseAPI(childrenArray, i);
-                if (URLFilenameTuple.Item2 == "lowScore") // TODO, seems messy
+                var urlFilenameTuple = parseAPI(childrenArray, i);
+                if (urlFilenameTuple.Item2 == "lowScore") // TODO, seems messy
                 {
                     Console.WriteLine("Post has insufficient user score, skipping post...");
                 }
-                else if (!(URLFilenameTuple.Item1 == null || URLFilenameTuple.Item2 == null))
+                else if (!(urlFilenameTuple.Item1 == null || urlFilenameTuple.Item2 == null))
                 {
-                    downloadFile(URLFilenameTuple.Item1, URLFilenameTuple.Item2);
+                    downloadFile(urlFilenameTuple.Item1, urlFilenameTuple.Item2);
                 }
                 else
                 {
                     Console.WriteLine("Unsupported media type entered, skipping post...");
                 }
             }
-
-            //TODO:
-            // Something about the filename extention / types, it's a bit risky
-
-
-            /* General structure of code:
-             *  1. A section that requests the user of what options they want. Defaults are necessary.
-             *  2. The desired subreddits to scan. This can be included in 1.
-             *  3. Do this in bulk. Progress bar? Some sort of waiting indicator.
-             *  4. For now, save all locally as per the options. 
-             *  4a. Otherwise, in the future, save thumbnails and let user tick off what they want.
-             *  5. Save and exit.
-             */
-
         }
     } 
 }
