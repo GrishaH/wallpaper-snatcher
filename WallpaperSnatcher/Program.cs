@@ -149,9 +149,8 @@ namespace WallpaperSnatcher
 
             Console.WriteLine("Press 1 to download images according to current settings.");
             Console.WriteLine("Press 9 to change the current options.");
-            string choice = Console.ReadLine();
-            if (choice.Equals("9"))
-            {
+            int.TryParse(Console.ReadLine(), out int choice);
+            if (choice == 9) {
                 modifyOptions();
             }
             int wallpaperAmount = int.Parse(ConfigurationManager.AppSettings["imageCount"]);
@@ -171,7 +170,7 @@ namespace WallpaperSnatcher
                 {
                     Console.WriteLine("Post has insufficient user score, skipping post...");
                 }
-                else if (!(urlFilenameTuple.Item1 == null || urlFilenameTuple.Item2 == null))
+                else if (!(String.IsNullOrWhiteSpace(urlFilenameTuple.Item1) || String.IsNullOrWhiteSpace(urlFilenameTuple.Item2)))
                 {
                     downloadFile(urlFilenameTuple.Item1, urlFilenameTuple.Item2);
                 }
